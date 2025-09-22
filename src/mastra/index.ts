@@ -9,6 +9,12 @@ import { z } from "zod";
 
 import { sharedPostgresStorage } from "./storage";
 import { inngest, inngestServe } from "./inngest";
+import { watchAnalysisAgent } from "./agents/watchAnalysisAgent";
+import { watchAnalysisWorkflow } from "./workflows/watchAnalysisWorkflow";
+import { watchImageAnalysisTool } from "./tools/watchImageAnalysisTool";
+import { priceSearchTool } from "./tools/priceSearchTool";
+import { registerTelegramTrigger } from "../triggers/telegramTriggers";
+import { format } from "node:util";
 
 class ProductionPinoLogger extends MastraLogger {
   protected logger: pino.Logger;
@@ -53,13 +59,13 @@ class ProductionPinoLogger extends MastraLogger {
 
 export const mastra = new Mastra({
   storage: sharedPostgresStorage,
-  agents: {},
-  workflows: {},
+  agents: { watchAnalysisAgent },
+  workflows: { watchAnalysisWorkflow },
   mcpServers: {
     allTools: new MCPServer({
       name: "allTools",
       version: "1.0.0",
-      tools: {},
+      tools: { watchImageAnalysisTool, priceSearchTool },
     }),
   },
   bundler: {
@@ -122,6 +128,54 @@ export const mastra = new Mastra({
         // 3. Establishing a publish-subscribe system for real-time monitoring
         //    through the workflow:${workflowId}:${runId} channel
       },
+      ...registerTelegramTrigger({
+        triggerType: "telegram/message",
+        handler: async (mastra, triggerInfo) => {
+          const logger = mastra.getLogger();
+          logger?.info("📝 [Telegram Trigger] Received message", { triggerInfo });
+
+          // Check if the message contains a photo
+          const hasPhoto = triggerInfo.payload?.message?.photo && triggerInfo.payload.message.photo.length > 0;
+          
+          if (!hasPhoto) {
+            // Send a helpful message if no photo is detected
+            const telegramBotToken = process.env.TELEGRAM_BOT_TOKEN;
+            if (telegramBotToken) {
+              try {
+                await fetch(`https://api.telegram.org/bot${telegramBotToken}/sendMessage`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    chat_id: triggerInfo.payload.message.chat.id,
+                    text: "👋 Hi! I'm a watch analysis bot. Please send me a photo of a watch and I'll help you identify it and find the best prices!",
+                    reply_to_message_id: triggerInfo.payload.message.message_id,
+                  }),
+                });
+              } catch (error) {
+                logger?.error("❌ [Telegram Trigger] Error sending no-photo message", { error: format(error) });
+              }
+            }
+            return;
+          }
+
+          // Get the largest photo for better analysis
+          const photos = triggerInfo.payload.message.photo;
+          const largestPhoto = photos[photos.length - 1];
+          const telegramFileId = largestPhoto.file_id;
+          
+          logger?.info("📝 [Telegram Trigger] Found watch photo", { telegramFileId });
+
+          const run = await mastra.getWorkflow("watchAnalysisWorkflow").createRunAsync();
+          await run.start({
+            inputData: {
+              message: `User sent a watch photo; telegram_file_id=${telegramFileId}`,
+              threadId: `telegram/${triggerInfo.payload.message.chat.id}`,
+              chatId: triggerInfo.payload.message.chat.id.toString(),
+              messageId: triggerInfo.payload.message.message_id,
+            }
+          });
+        },
+      }),
     ],
   },
   logger:
