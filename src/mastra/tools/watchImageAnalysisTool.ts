@@ -54,33 +54,33 @@ const analyzeWatchImage = async ({
           content: [
             {
               type: "text",
-              text: `Please analyze this watch image and provide detailed information in JSON format.
+              text: `FOCUS: Extract the exact reference number from this watch image. Reference numbers are the key to precise identification.
 
-Analyze the watch for:
-1. Brand (e.g., Rolex, Omega, Seiko, etc.)
-2. Model/Series name (e.g., Submariner, Speedmaster, etc.)
-3. Reference number (if visible on dial, case, or bezel)
-4. Watch type (dress, sport, diving, chronograph, etc.)
-5. Key features and complications visible
-6. Materials (steel, gold, ceramic, etc.)
-7. Confidence level (0.0 to 1.0) in your identification
-8. Any uncertainties or ambiguities you notice
+LOOK FOR REFERENCE NUMBERS IN:
+1. Dial text (small numbers/letters around edges)
+2. Case back engravings
+3. Between lugs
+4. Bezel markings
+5. Hour markers or sub-dials
+6. Any visible model codes
 
-Return ONLY a valid JSON object with this exact structure:
+ALSO IDENTIFY:
+- Brand and model
+- Visual clues that could help find the reference number online
+
+Return ONLY a valid JSON object:
 {
   "brand": "Brand name or 'Unknown'",
   "model": "Model name or 'Unknown'",
-  "referenceNumber": "Reference number if visible or 'Unknown'",
-  "watchType": "Type category",
-  "features": ["feature1", "feature2"],
-  "materials": ["material1", "material2"],
+  "referenceNumber": "EXACT reference number if found or 'Unknown'",
+  "possibleReferenceNumbers": ["candidate1", "candidate2"],
+  "visualClues": ["clue1", "clue2"],
   "confidence": 0.85,
-  "uncertaintyReasons": ["reason1", "reason2"],
-  "candidateQueries": ["search query 1", "search query 2"],
-  "searchQuery": "best single search query for this watch"
+  "needsImageSearch": true,
+  "searchQuery": "brand model visual-clues"
 }
 
-Be conservative with confidence scoring. Use 0.9+ only when you're very certain of brand and model.`,
+PRIORITY: Finding the reference number is most important. Be very thorough in examining all visible text and numbers.`,
             },
             {
               type: "image",
@@ -118,13 +118,11 @@ Be conservative with confidence scoring. Use 0.9+ only when you're very certain 
         brand,
         model,
         referenceNumber: "Unknown",
-        watchType: "Unknown",
-        features: [],
-        materials: [],
+        possibleReferenceNumbers: [],
+        visualClues: ["Failed to parse AI response"],
         confidence: 0.3,
-        uncertaintyReasons: ["Failed to parse AI response"],
-        candidateQueries: [`${brand} ${model} watch`],
-        searchQuery: `${brand} ${model} watch price`
+        needsImageSearch: true,
+        searchQuery: `${brand} ${model} watch`
       };
     }
 
@@ -151,14 +149,12 @@ export const watchImageAnalysisTool = createTool({
   outputSchema: z.object({
     brand: z.string().describe("Watch brand name"),
     model: z.string().describe("Watch model/series name"),
-    referenceNumber: z.string().describe("Reference number if visible"),
-    watchType: z.string().describe("Type of watch (dress, sport, diving, etc.)"),
-    features: z.array(z.string()).describe("Key features and complications"),
-    materials: z.array(z.string()).describe("Materials used (steel, gold, etc.)"),
+    referenceNumber: z.string().describe("Exact reference number if found"),
+    possibleReferenceNumbers: z.array(z.string()).describe("Candidate reference numbers"),
+    visualClues: z.array(z.string()).describe("Visual clues for identification"),
     confidence: z.number().min(0).max(1).describe("Confidence in identification (0-1)"),
-    uncertaintyReasons: z.array(z.string()).describe("Reasons for any uncertainty"),
-    candidateQueries: z.array(z.string()).describe("Alternative search queries"),
-    searchQuery: z.string().describe("Best search query for this watch"),
+    needsImageSearch: z.boolean().describe("Whether Google Images search is needed"),
+    searchQuery: z.string().describe("Search query for image verification"),
   }),
   execute: async ({ context: { telegramFileId }, mastra }) => {
     const logger = mastra?.getLogger();

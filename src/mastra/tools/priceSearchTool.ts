@@ -12,9 +12,8 @@ const searchGoogleShopping = async ({
   logger?.info("🔧 [PriceSearch] Starting Google Shopping search", { searchQuery });
 
   try {
-    // Construct German Google Shopping search URL with German keywords
-    const germanQuery = `${searchQuery} Preis Deutschland kaufen`;
-    const encodedQuery = encodeURIComponent(germanQuery);
+    // Construct German Google Shopping search URL (no additional keywords for precise reference number search)
+    const encodedQuery = encodeURIComponent(searchQuery);
     const googleShoppingUrl = `https://www.google.com/search?tbm=shop&hl=de&gl=de&lr=lang_de&q=${encodedQuery}`;
     
     logger?.info("📝 [PriceSearch] Fetching search results...");
@@ -57,7 +56,7 @@ const searchGoogleShopping = async ({
     // Return a fallback response with manual search suggestion
     return {
       searchQuery,
-      googleShoppingUrl: `https://www.google.com/search?tbm=shop&hl=de&gl=de&lr=lang_de&q=${encodeURIComponent(searchQuery + ' Preis Deutschland')}`,
+      googleShoppingUrl: `https://www.google.com/search?tbm=shop&hl=de&gl=de&lr=lang_de&q=${encodeURIComponent(searchQuery)}`,
       results: [],
       summary: `Ich konnte keine Preise für "${searchQuery}" automatisch abrufen. Sie können manuell über den Google Shopping Link oben nach aktuellen Preisen verschiedener Händler suchen.`,
       error: error instanceof Error ? error.message : 'Unknown error occurred',
