@@ -3,7 +3,7 @@ import { z } from "zod";
 import { watchAnalysisAgent } from "../agents/watchAnalysisAgent";
 
 const step1 = createStep({
-  id: "use-watch-agent",
+  id: "use-watch-agent", 
   description: "Analyze watch image and get price information using the watch analysis agent",
   inputSchema: z.object({
     message: z.string(),
@@ -13,7 +13,7 @@ const step1 = createStep({
   }),
   outputSchema: z.object({
     response: z.string(),
-    chatId: z.string(),
+    chatId: z.string(), 
     messageId: z.number(),
   }),
   execute: async ({ inputData, mastra }) => {
