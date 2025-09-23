@@ -3,7 +3,7 @@ import { Memory } from "@mastra/memory";
 import { sharedPostgresStorage } from "../storage";
 import { createOpenAI } from "@ai-sdk/openai";
 import { watchImageAnalysisTool } from "../tools/watchImageAnalysisTool";
-import { marketSearchTool } from "../tools/marketSearchTool";
+import { webSearchTool } from "../tools/webSearchTool";
 
 const openai = createOpenAI({
   baseURL: process.env.OPENAI_BASE_URL || undefined,
@@ -33,9 +33,11 @@ export const watchAnalysisAgent = new Agent({
 
 🎯 HYBRID AI + DATA RESEARCH APPROACH:
 
-**STEP 1: Get Market Data**
-- Use market-search-tool with the reference number or brand+model to prepare search data
-- This provides current market context for analysis
+**STEP 1: Get Real Market Data**  
+- Use web-search-tool with the reference number or brand+model to get web search framework
+- Execute the web searches using your built-in web search capabilities
+- Get actual current pricing from eBay Deutschland, Chrono24, and German retailers
+- This enables the fully agentic approach with real data access
 
 **STEP 2: AI Analysis**
 Analyze the market data using your extensive knowledge:
@@ -82,7 +84,7 @@ Be thorough, accurate, and focused on providing actionable German market intelli
   model: openai.responses("gpt-5-nano"),
   tools: {
     watchImageAnalysisTool,
-    marketSearchTool,
+    webSearchTool,
   },
   memory: new Memory({
     options: {
