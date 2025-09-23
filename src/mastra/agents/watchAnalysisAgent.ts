@@ -3,6 +3,7 @@ import { Memory } from "@mastra/memory";
 import { sharedPostgresStorage } from "../storage";
 import { createOpenAI } from "@ai-sdk/openai";
 import { watchImageAnalysisTool } from "../tools/watchImageAnalysisTool";
+import { marketSearchTool } from "../tools/marketSearchTool";
 
 const openai = createOpenAI({
   baseURL: process.env.OPENAI_BASE_URL || undefined,
@@ -30,8 +31,14 @@ export const watchAnalysisAgent = new Agent({
 1. Recognize reference numbers in user messages
 2. Proceed directly to market research using the reference number
 
-🎯 AI-POWERED PRICE RESEARCH:
-Use your extensive knowledge to research current market prices across:
+🎯 HYBRID AI + DATA RESEARCH APPROACH:
+
+**STEP 1: Get Market Data**
+- Use market-search-tool with the reference number or brand+model to prepare search data
+- This provides current market context for analysis
+
+**STEP 2: AI Analysis**
+Analyze the market data using your extensive knowledge:
 
 **eBay Deutschland (.de):**
 - Recent sold listings and current auctions
@@ -75,6 +82,7 @@ Be thorough, accurate, and focused on providing actionable German market intelli
   model: openai.responses("gpt-5-nano"),
   tools: {
     watchImageAnalysisTool,
+    marketSearchTool,
   },
   memory: new Memory({
     options: {
