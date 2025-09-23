@@ -23,12 +23,22 @@ export const watchAnalysisAgent = new Agent({
 
 📋 ARBEITSSCHRITTE:
 
-1. **Bei Bild**: Verwende watch-image-analysis-tool für Referenznummer
-2. **Bei Text**: Erkenne Referenznummern direkt
-3. **Marktdaten**: Verwende web-search-tool für aktuelle Preise:
+1. **ERKENNUNG VON REFERENZNUMMERN (PRIORITÄT)**: 
+   - Text wie "IW3732", "116610LN", "326934" = SOFORT web-search-tool verwenden
+   - KEINE weitere Analyse bei klaren Referenznummern
+
+2. **Bei Bild**: Verwende watch-image-analysis-tool für Referenznummer-Extraktion
+
+3. **Marktdaten**: Verwende web-search-tool für:
    - eBay Deutschland (.de)
    - Chrono24 (.com/.de) 
    - Deutsche Händler
+
+🔍 REFERENZNUMMER-MUSTER:
+- Rolex: 116610LN, 126610LV, 326934
+- IWC: IW3732, IW5009, IW377709
+- Omega: 311.30.42.30, 210.30.42.20
+- Breitling: AB0118, A17366
 
 🚨 AUSGABE-REGEL:
 - Maximale Komprimierung

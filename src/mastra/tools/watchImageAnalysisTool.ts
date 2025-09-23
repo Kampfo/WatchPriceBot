@@ -54,33 +54,37 @@ const analyzeWatchImage = async ({
           content: [
             {
               type: "text",
-              text: `FOCUS: Extract the exact reference number from this watch image. Reference numbers are the key to precise identification.
+              text: `EXTRACT THE REFERENCE NUMBER FROM THIS WATCH IMAGE. Reference numbers are usually alphanumeric codes like: 116610LN, IW3732, 326934, etc.
 
-LOOK FOR REFERENCE NUMBERS IN:
-1. Dial text (small numbers/letters around edges)
-2. Case back engravings
-3. Between lugs
-4. Bezel markings
-5. Hour markers or sub-dials
-6. Any visible model codes
+CHECK THESE LOCATIONS FOR REFERENCE NUMBERS:
+1. Between the lugs (at 12 and 6 o'clock positions)
+2. Case back engravings  
+3. Dial edges (small text around perimeter)
+4. Hour markers or minute track
+5. Sub-dial text
+6. Crown guards area
+7. Rehaut (inner bezel ring)
 
-ALSO IDENTIFY:
-- Brand and model
-- Visual clues that could help find the reference number online
+COMMON REFERENCE NUMBER PATTERNS:
+- Rolex: 6-digit numbers (116610, 126610, etc.)
+- IWC: Letters+numbers (IW3732, IW5009, etc.)  
+- Omega: Numbers with dots (311.30.42.30, etc.)
+- Breitling: Letters+numbers (AB0118, A17366, etc.)
 
-Return ONLY a valid JSON object:
+EXAMINE EVERY VISIBLE NUMBER AND LETTER CAREFULLY.
+
+Return JSON:
 {
-  "brand": "Brand name or 'Unknown'",
-  "model": "Model name or 'Unknown'",
-  "referenceNumber": "EXACT reference number if found or 'Unknown'",
-  "possibleReferenceNumbers": ["candidate1", "candidate2"],
-  "visualClues": ["clue1", "clue2"],
-  "confidence": 0.85,
-  "needsImageSearch": true,
-  "searchQuery": "brand model visual-clues"
+  "brand": "Brand name",
+  "model": "Model/collection name", 
+  "referenceNumber": "EXACT reference number if found",
+  "possibleReferenceNumbers": ["all candidate numbers seen"],
+  "visualClues": ["dial color", "complications", "material", "size"],
+  "confidence": 0.9,
+  "searchQuery": "brand reference-number OR brand model if no ref found"
 }
 
-PRIORITY: Finding the reference number is most important. Be very thorough in examining all visible text and numbers.`,
+CRITICAL: Look for ANY alphanumeric codes, even if partially visible. Reference numbers are the most important data.`,
             },
             {
               type: "image",
