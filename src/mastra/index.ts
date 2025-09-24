@@ -12,7 +12,7 @@ import { inngest, inngestServe } from "./inngest";
 import { watchAnalysisAgent } from "./agents/watchAnalysisAgent";
 import { watchAnalysisWorkflow } from "./workflows/watchAnalysisWorkflow";
 import { watchImageAnalysisTool } from "./tools/watchImageAnalysisTool";
-import { priceSearchTool } from "./tools/priceSearchTool";
+import { webSearchTool } from "./tools/webSearchTool";
 import { registerTelegramTrigger } from "../triggers/telegramTriggers";
 import { format } from "node:util";
 
@@ -65,7 +65,7 @@ export const mastra = new Mastra({
     allTools: new MCPServer({
       name: "allTools",
       version: "1.0.0",
-      tools: { watchImageAnalysisTool, priceSearchTool },
+      tools: { watchImageAnalysisTool, webSearchTool },
     }),
   },
   bundler: {

@@ -89,7 +89,7 @@ const step2 = createStep({
   }
 });
 
-export const watchAnalysisWorkflow = createWorkflow({
+const workflowDefinition = createWorkflow({
   id: "watch-analysis-workflow",
   description: "Analyzes watch images and provides price comparisons via Telegram",
   inputSchema: z.object({
@@ -101,7 +101,10 @@ export const watchAnalysisWorkflow = createWorkflow({
   outputSchema: z.object({
     sent: z.boolean(),
   }),
-})
-  .then(step1)
-  .then(step2)
+});
+
+// Type definitions from @mastra/inngest currently expect generic Zod types; explicit casting keeps inference stable.
+export const watchAnalysisWorkflow = (workflowDefinition as any)
+  .then(step1 as any)
+  .then(step2 as any)
   .commit();
