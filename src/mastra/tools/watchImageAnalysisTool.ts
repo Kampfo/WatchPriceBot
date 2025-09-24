@@ -9,6 +9,67 @@ const openai = createOpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+type ParsedImageAnalysis = {
+  brand: string;
+  model: string;
+  referenceNumber: string;
+  possibleReferenceNumbers: string[];
+  detectedTexts: string[];
+  visualClues: string[];
+  confidence: number;
+  needsImageSearch: boolean;
+  searchQuery: string;
+  notes: string[];
+};
+
+const normaliseStringArray = (values: unknown, fallback: string[] = []): string[] => {
+  if (!Array.isArray(values)) {
+    return fallback;
+  }
+  const cleaned = values
+    .map(value => (typeof value === "string" ? value.trim() : ""))
+    .filter(Boolean);
+  const unique = Array.from(new Set(cleaned));
+  return unique.length > 0 ? unique : fallback;
+};
+
+const sanitiseAnalysis = (raw: Partial<ParsedImageAnalysis>): ParsedImageAnalysis => {
+  const brand = (raw.brand ?? "Unknown").trim() || "Unknown";
+  const model = (raw.model ?? "Unknown").trim() || "Unknown";
+  const possibleReferenceNumbers = normaliseStringArray(raw.possibleReferenceNumbers);
+  const detectedTexts = normaliseStringArray(raw.detectedTexts, possibleReferenceNumbers);
+  const visualClues = normaliseStringArray(raw.visualClues);
+  const notes = normaliseStringArray(raw.notes);
+
+  const referenceNumberCandidate = (raw.referenceNumber ?? "Unknown").trim();
+  const referenceNumber = referenceNumberCandidate || "Unknown";
+
+  const confidence = typeof raw.confidence === "number" ? Math.max(0, Math.min(1, raw.confidence)) : 0.4;
+  const needsImageSearch =
+    typeof raw.needsImageSearch === "boolean"
+      ? raw.needsImageSearch
+      : referenceNumber === "Unknown" || confidence < 0.65;
+
+  const searchQuery = raw.searchQuery
+    ? raw.searchQuery
+    : referenceNumber !== "Unknown"
+      ? `${brand} ${referenceNumber}`.trim()
+      : `${brand} ${model}`.trim();
+
+  return {
+    brand,
+    model,
+    referenceNumber,
+    possibleReferenceNumbers,
+    detectedTexts,
+    visualClues,
+    confidence,
+    needsImageSearch,
+    searchQuery: searchQuery || `${brand} watch`,
+    notes,
+  };
+};
+
 const analyzeWatchImage = async ({
   telegramFileId,
   logger,
@@ -19,33 +80,31 @@ const analyzeWatchImage = async ({
   logger?.info("🔧 [WatchImageAnalysis] Starting watch image analysis", { telegramFileId });
 
   try {
-    // Get file path from Telegram API using the file ID
     logger?.info("📝 [WatchImageAnalysis] Getting file path from Telegram...");
     const telegramBotToken = process.env.TELEGRAM_BOT_TOKEN;
     if (!telegramBotToken) {
       throw new Error("TELEGRAM_BOT_TOKEN not found");
     }
-    
+
     const fileResponse = await fetch(`https://api.telegram.org/bot${telegramBotToken}/getFile?file_id=${telegramFileId}`);
     const fileData = await fileResponse.json();
-    
+
     if (!fileData.ok) {
       throw new Error(`Failed to get file path: ${fileData.description}`);
     }
-    
-    // Download image using the file path
+
     const imageUrl = `https://api.telegram.org/file/bot${telegramBotToken}/${fileData.result.file_path}`;
     logger?.info("📝 [WatchImageAnalysis] Downloading image...");
     const imageResponse = await fetch(imageUrl);
     if (!imageResponse.ok) {
       throw new Error(`Failed to fetch image: ${imageResponse.status}`);
     }
-    
+
     const imageBuffer = await imageResponse.arrayBuffer();
-    const base64Image = `data:image/jpeg;base64,${Buffer.from(imageBuffer).toString('base64')}`;
-    
+    const base64Image = `data:image/jpeg;base64,${Buffer.from(imageBuffer).toString("base64")}`;
+
     logger?.info("📝 [WatchImageAnalysis] Calling OpenAI vision model...");
-    
+
     const result = await generateText({
       model: openai("gpt-4o"),
       messages: [
@@ -54,37 +113,30 @@ const analyzeWatchImage = async ({
           content: [
             {
               type: "text",
-              text: `EXTRACT THE REFERENCE NUMBER FROM THIS WATCH IMAGE. Reference numbers are usually alphanumeric codes like: 116610LN, IW3732, 326934, etc.
+              text: `Du bist ein Profi für das Erkennen von Uhren-Referenzen auf Fotos.
+Analysiere das Bild gründlich und gib ausschließlich valides JSON zurück.
 
-CHECK THESE LOCATIONS FOR REFERENCE NUMBERS:
-1. Between the lugs (at 12 and 6 o'clock positions)
-2. Case back engravings  
-3. Dial edges (small text around perimeter)
-4. Hour markers or minute track
-5. Sub-dial text
-6. Crown guards area
-7. Rehaut (inner bezel ring)
-
-COMMON REFERENCE NUMBER PATTERNS:
-- Rolex: 6-digit numbers (116610, 126610, etc.)
-- IWC: Letters+numbers (IW3732, IW5009, etc.)  
-- Omega: Numbers with dots (311.30.42.30, etc.)
-- Breitling: Letters+numbers (AB0118, A17366, etc.)
-
-EXAMINE EVERY VISIBLE NUMBER AND LETTER CAREFULLY.
-
-Return JSON:
+Pflichtfelder:
 {
-  "brand": "Brand name",
-  "model": "Model/collection name", 
-  "referenceNumber": "EXACT reference number if found",
-  "possibleReferenceNumbers": ["all candidate numbers seen"],
-  "visualClues": ["dial color", "complications", "material", "size"],
-  "confidence": 0.9,
-  "searchQuery": "brand reference-number OR brand model if no ref found"
+  "brand": "Marke (z. B. Rolex)",
+  "model": "Modell/Serie",
+  "referenceNumber": "Exakte Referenznummer oder 'Unknown'",
+  "possibleReferenceNumbers": ["alle sichtbaren Kandidaten"],
+  "detectedTexts": ["alle lesbaren Beschriftungen, Gravuren und Zahlen"],
+  "visualClues": ["Material, Farbe, Komplikationen, Lünetten-Typ etc."],
+  "confidence": 0.0-1.0,
+  "needsImageSearch": true/false (true, wenn Referenz unsicher oder nicht sichtbar),
+  "searchQuery": "Bevorzugt 'Marke Referenz', sonst 'Marke Modell'",
+  "notes": ["wichtige Beobachtungen"]
 }
 
-CRITICAL: Look for ANY alphanumeric codes, even if partially visible. Reference numbers are the most important data.`,
+Vorgehen:
+1. Liste zuerst jedes lesbare Wort/Zahl in detectedTexts (z. B. 'OYSTER PERPETUAL', '116610LN').
+2. Ermittle daraus mögliche Referenzen und lege sie in possibleReferenceNumbers ab (inkl. Bruchstücke).
+3. Falls eine Referenz eindeutig ist, trage sie in referenceNumber ein.
+4. Confidence hoch nur bei klarer Referenz (z. B. sichtbare Gravur).
+5. needsImageSearch = true, wenn Referenz unsicher bleibt oder mehrere Kandidaten existieren.
+6. Gib NUR das JSON zurück, ohne zusätzliche Erklärungen.`,
             },
             {
               type: "image",
@@ -95,52 +147,48 @@ CRITICAL: Look for ANY alphanumeric codes, even if partially visible. Reference 
       ],
     });
 
-    // Parse the JSON response
-    let analysisData;
+    let analysisData: ParsedImageAnalysis;
     try {
-      // Clean the response text to extract JSON
       const jsonText = result.text.trim();
       const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
-        analysisData = JSON.parse(jsonMatch[0]);
+        const parsed = JSON.parse(jsonMatch[0]);
+        analysisData = sanitiseAnalysis(parsed);
       } else {
         throw new Error("No JSON found in response");
       }
     } catch (parseError) {
-      logger?.error("❌ [WatchImageAnalysis] Failed to parse JSON response", { 
-        error: parseError, 
-        rawResponse: result.text 
+      logger?.error("❌ [WatchImageAnalysis] Failed to parse JSON response", {
+        error: parseError,
+        rawResponse: result.text,
       });
-      // Fallback to simple parsing
-      const analysisText = result.text;
-      const brandMatch = analysisText.match(/brand[:\s]*([^,\n]+)/i);
-      const brand = brandMatch ? brandMatch[1].trim() : "Unknown";
-      const modelMatch = analysisText.match(/model[:\s]*([^,\n]+)/i);
-      const model = modelMatch ? modelMatch[1].trim() : "Unknown";
-      
-      analysisData = {
-        brand,
-        model,
+      const fallbackData: ParsedImageAnalysis = {
+        brand: "Unknown",
+        model: "Unknown",
         referenceNumber: "Unknown",
         possibleReferenceNumbers: [],
+        detectedTexts: [],
         visualClues: ["Failed to parse AI response"],
-        confidence: 0.3,
+        confidence: 0.2,
         needsImageSearch: true,
-        searchQuery: `${brand} ${model} watch`
+        searchQuery: "luxury watch", // generic fallback
+        notes: ["Vision-Modell lieferte kein valides JSON"],
       };
+      analysisData = fallbackData;
     }
 
-    logger?.info("✅ [WatchImageAnalysis] Analysis completed", { 
+    logger?.info("✅ [WatchImageAnalysis] Analysis completed", {
       brand: analysisData.brand,
       model: analysisData.model,
+      referenceNumber: analysisData.referenceNumber,
       confidence: analysisData.confidence,
-      uncertaintyReasons: analysisData.uncertaintyReasons
+      needsImageSearch: analysisData.needsImageSearch,
     });
-    
+
     return analysisData;
   } catch (error) {
     logger?.error("❌ [WatchImageAnalysis] Error analyzing watch image", { error });
-    throw new Error(`Failed to analyze watch image: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    throw new Error(`Failed to analyze watch image: ${error instanceof Error ? error.message : "Unknown error"}`);
   }
 };
 
@@ -155,15 +203,18 @@ export const watchImageAnalysisTool = createTool({
     model: z.string().describe("Watch model/series name"),
     referenceNumber: z.string().describe("Exact reference number if found"),
     possibleReferenceNumbers: z.array(z.string()).describe("Candidate reference numbers"),
+    detectedTexts: z.array(z.string()).describe("All detected textual elements"),
     visualClues: z.array(z.string()).describe("Visual clues for identification"),
     confidence: z.number().min(0).max(1).describe("Confidence in identification (0-1)"),
     needsImageSearch: z.boolean().describe("Whether Google Images search is needed"),
     searchQuery: z.string().describe("Search query for image verification"),
+    notes: z.array(z.string()).describe("Additional observations from the model"),
   }),
   execute: async ({ context: { telegramFileId }, mastra }) => {
     const logger = mastra?.getLogger();
     logger?.info("🔧 [WatchImageAnalysis] Starting execution with params:", { telegramFileId });
-    
-    return await analyzeWatchImage({ telegramFileId, logger });
+
+    const result = await analyzeWatchImage({ telegramFileId, logger });
+    return result;
   },
 });
